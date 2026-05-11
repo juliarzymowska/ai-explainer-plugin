@@ -1,19 +1,42 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<!--<idea-plugin>-->
+<!--    <id>com.github.juliarzymowska.plugin</id>-->
+<!--    <name>plugin</name>-->
+<!--    <vendor>juliarzymowska</vendor>-->
+<!--    <description><![CDATA[-->
+<!--        <p><b>plugin</b> is a repository that provides a pure template to make it easier to create a new plugin project.</p>-->
+<!--        <p>The main goal of this template is to speed up the setup phase of plugin development for both new and experienced developers by preconfiguring the project scaffold and CI, linking to the proper documentation pages, and keeping everything organized.</p>-->
+<!--    ]]></description>-->
+
+<!--    <depends>com.intellij.modules.platform</depends>-->
+
+<!--    <resource-bundle>messages.MyBundle</resource-bundle>-->
+
+<!--    <extensions defaultExtensionNs="com.intellij">-->
+<!--        <toolWindow factoryClass="com.github.juliarzymowska.plugin.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>-->
+<!--        <postStartupActivity implementation="com.github.juliarzymowska.plugin.startup.MyProjectActivity" />-->
+<!--    </extensions>-->
+<!--</idea-plugin>-->
 <idea-plugin>
-    <id>com.github.juliarzymowska.plugin</id>
-    <name>plugin</name>
+    <id>com.github.juliarzymowska.aiconsoleexplainer</id>
+    <name>AI Console Explainer</name>
     <vendor>juliarzymowska</vendor>
     <description><![CDATA[
-        <p><b>plugin</b> is a repository that provides a pure template to make it easier to create a new plugin project.</p>
-        <p>The main goal of this template is to speed up the setup phase of plugin development for both new and experienced developers by preconfiguring the project scaffold and CI, linking to the proper documentation pages, and keeping everything organized.</p>
+        <p><b>AI Console Explainer</b> integrates LLMs directly into the IDE run console.</p>
+        <p>Right-click any error message or stack trace to get an instant AI-generated explanation and suggested fix, streamlining the debugging process without leaving the IDE.</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
 
-    <resource-bundle>messages.MyBundle</resource-bundle>
-
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.juliarzymowska.plugin.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
-        <postStartupActivity implementation="com.github.juliarzymowska.plugin.startup.MyProjectActivity" />
-    </extensions>
+        </extensions>
+
+    <actions>
+        <action id="ConsoleAiExplainerAction"
+                class="com.github.juliarzymowska.plugin.actions.ExplainErrorAction"
+                text="Explain Error with AI"
+                description="Sends selected console text to an LLM for analysis">
+            <add-to-group group-id="ConsoleEditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>
