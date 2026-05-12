@@ -5,7 +5,7 @@
     <vendor email="twoj@email.com" url="https://www.twojastrona.com">Julia</vendor>
 
     <description><![CDATA[
-      Narzędzie do inteligentnej analizy błędów z konsoli z wstrzykiwaniem kontekstu kodu źródłowego.
+      An intelligent tool for analyzing console errors and stack traces with automated source code context injection.
     ]]></description>
 
     <!-- To mówi IDE, że wtyczka wymaga projektów Java -->
