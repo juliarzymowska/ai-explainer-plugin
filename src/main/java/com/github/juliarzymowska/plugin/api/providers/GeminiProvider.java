@@ -14,7 +14,11 @@ public class GeminiProvider extends BaseAiProvider {
 
     @Override
     protected HttpRequest buildHttpRequest(String errorMessage, String sourceCode, String apiKey) {
-        String apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=" + apiKey;
+        // Pobieramy model z nowych ustawień
+        String selectedModel = com.github.juliarzymowska.plugin.settings.AiExplainerSettingsState.getInstance().geminiModel;
+
+        // Dynamiczny URL ze wstrzykniętym modelem
+        String apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + selectedModel + ":generateContent?key=" + apiKey;
 
         // Safety check in case source code is empty or null
         String finalSourceCode = (sourceCode != null && !sourceCode.trim().isEmpty())
@@ -28,10 +32,18 @@ public class GeminiProvider extends BaseAiProvider {
         JsonObject requestBody = buildRequestBody(formattedPrompt);
 
         return HttpRequest.newBuilder()
-                .uri(URI.create(apiUrl))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(requestBody)))
-                .build();
+                        .
+
+                uri(URI.create(apiUrl))
+                        .
+
+                header("Content-Type", "application/json")
+                        .
+
+                POST(HttpRequest.BodyPublishers.ofString(gson.toJson(requestBody)))
+                        .
+
+                build();
     }
 
     // Wyciągnięta logika budowania JSON-a

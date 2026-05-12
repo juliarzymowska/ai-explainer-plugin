@@ -1,10 +1,6 @@
 package com.github.juliarzymowska.plugin.settings;
 
 import com.intellij.openapi.options.Configurable;
-import com.intellij.openapi.ui.ComboBox;
-import com.intellij.ui.components.JBLabel;
-import com.intellij.ui.components.JBPasswordField;
-import com.intellij.util.ui.FormBuilder;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
 
@@ -12,67 +8,51 @@ import javax.swing.*;
 
 public class AiExplainerConfigurable implements Configurable {
 
-    private JPanel mainPanel;
-    private JBPasswordField apiKeyField;
-    private ComboBox<String> providerComboBox;
+    private AiExplainerSettingsComponent settingsComponent;
 
     @Nls(capitalization = Nls.Capitalization.Title)
     @Override
     public String getDisplayName() {
-        return "AI Console Log Explainer";
+        return "AI Explainer";
     }
 
     @Nullable
     @Override
     public JComponent createComponent() {
-        apiKeyField = new JBPasswordField();
-
-        providerComboBox = new ComboBox<>(new String[]{"Gemini", "OpenAI"});
-
-        mainPanel = FormBuilder.createFormBuilder()
-                .addLabeledComponent(new JBLabel("AI provider: "), providerComboBox, 1, false)
-                .addLabeledComponent(new JBLabel("API key: "), apiKeyField, 1, false)
-                .addComponentFillVertically(new JPanel(), 0)
-                .getPanel();
-
-        return mainPanel;
+        settingsComponent = new AiExplainerSettingsComponent();
+        return settingsComponent.getPanel();
     }
 
     @Override
     public boolean isModified() {
         AiExplainerSettingsState settings = AiExplainerSettingsState.getInstance();
-
-        String currentKey = new String(apiKeyField.getPassword());
-        String currentProvider = (String) providerComboBox.getSelectedItem();
-
-        boolean isKeyModified = !currentKey.equals(settings.apiKey);
-        boolean isProviderModified = currentProvider != null && !currentProvider.equals(settings.aiProvider);
-
-        return isKeyModified || isProviderModified;
+        boolean modified = !settingsComponent.getActiveProvider().equals(settings.activeProvider);
+        modified |= !settingsComponent.getOpenAiApiKey().equals(settings.openAiApiKey);
+        modified |= !settingsComponent.getGeminiApiKey().equals(settings.geminiApiKey);
+        modified |= !settingsComponent.getGeminiModel().equals(settings.geminiModel);
+        return modified;
     }
 
     @Override
     public void apply() {
         AiExplainerSettingsState settings = AiExplainerSettingsState.getInstance();
-        settings.apiKey = new String(apiKeyField.getPassword());
-
-        if (providerComboBox.getSelectedItem() != null) {
-            settings.aiProvider = (String) providerComboBox.getSelectedItem();
-        }
+        settings.activeProvider = settingsComponent.getActiveProvider();
+        settings.openAiApiKey = settingsComponent.getOpenAiApiKey();
+        settings.geminiApiKey = settingsComponent.getGeminiApiKey();
+        settings.geminiModel = settingsComponent.getGeminiModel();
     }
 
     @Override
     public void reset() {
         AiExplainerSettingsState settings = AiExplainerSettingsState.getInstance();
-        apiKeyField.setText(settings.apiKey);
-
-        providerComboBox.setSelectedItem(settings.aiProvider);
+        settingsComponent.setActiveProvider(settings.activeProvider);
+        settingsComponent.setOpenAiApiKey(settings.openAiApiKey);
+        settingsComponent.setGeminiApiKey(settings.geminiApiKey);
+        settingsComponent.setGeminiModel(settings.geminiModel);
     }
 
     @Override
     public void disposeUIResources() {
-        mainPanel = null;
-        apiKeyField = null;
-        providerComboBox = null;
+        settingsComponent = null;
     }
 }

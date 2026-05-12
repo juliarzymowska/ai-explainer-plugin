@@ -5,17 +5,19 @@ import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 @State(
         name = "com.github.juliarzymowska.plugin.settings.AiExplainerSettingsState",
-        storages = @Storage("AiExplainerSettings.xml")
+        storages = @Storage("AiExplainerPlugin.xml")
 )
 public class AiExplainerSettingsState implements PersistentStateComponent<AiExplainerSettingsState> {
-    public String apiKey = "";
 
-    public String aiProvider = "Gemini";
+    // Nowa struktura danych
+    public String activeProvider = "Gemini";
+    public String openAiApiKey = "";
+    public String geminiApiKey = "";
+    public String geminiModel = "gemini-3.1-flash-lite";
 
     public static AiExplainerSettingsState getInstance() {
         return ApplicationManager.getApplication().getService(AiExplainerSettingsState.class);
@@ -28,7 +30,7 @@ public class AiExplainerSettingsState implements PersistentStateComponent<AiExpl
     }
 
     @Override
-    public void loadState(@NotNull AiExplainerSettingsState state) {
+    public void loadState(AiExplainerSettingsState state) {
         XmlSerializerUtil.copyBean(state, this);
     }
 }

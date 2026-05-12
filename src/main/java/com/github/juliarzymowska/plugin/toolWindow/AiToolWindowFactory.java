@@ -14,7 +14,6 @@ import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
-import com.intellij.ui.jcef.JBCefOsrHandlerBrowser;
 import org.jetbrains.annotations.NotNull;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
@@ -75,9 +74,10 @@ public class AiToolWindowFactory implements ToolWindowFactory {
         sendToAiButton.addActionListener(e -> {
             String errorMessage = sharedState.getErrorMessage();
             String sourceCode = sharedState.getSourceCode();
-            String apiKey = AiExplainerSettingsState.getInstance().apiKey;
-            String providerName = AiExplainerSettingsState.getInstance().aiProvider;
-
+            String providerName = AiExplainerSettingsState.getInstance().activeProvider;
+            String apiKey = providerName.equals("Gemini")
+                    ? AiExplainerSettingsState.getInstance().geminiApiKey
+                    : AiExplainerSettingsState.getInstance().openAiApiKey;
             if (apiKey == null || apiKey.trim().isEmpty()) {
                 aiResponsePane.setText("<html><body style='color: red;'>API Key is missing! Please configure it in Settings.</body></html>");
                 return;
