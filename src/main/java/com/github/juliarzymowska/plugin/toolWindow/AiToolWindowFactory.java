@@ -1,19 +1,19 @@
 package com.github.juliarzymowska.plugin.toolWindow;
 
 import com.github.juliarzymowska.plugin.api.providers.AiProvider;
-import com.github.juliarzymowska.plugin.api.AiProviderFactory;
+import com.github.juliarzymowska.plugin.api.providers.AiProviderFactory;
+import com.github.juliarzymowska.plugin.services.SharedStateService;
+import com.github.juliarzymowska.plugin.settings.AiExplainerSettingsState;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import com.intellij.execution.ExecutionManager;
-import com.intellij.execution.ui.RunContentDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
 import org.jetbrains.annotations.NotNull;
-import com.github.juliarzymowska.plugin.settings.AiExplainerSettingsState;
 
 import javax.swing.*;
 import java.awt.*;
@@ -22,104 +22,94 @@ public class AiToolWindowFactory implements ToolWindowFactory {
 
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
-        // 1. Tworzymy główny panel
         JPanel mainPanel = new JPanel(new BorderLayout());
 
-        // 2. Tworzymy pole tekstowe, w którym pokażemy zczytany błąd
         JTextArea consoleTextArea = new JTextArea();
-        consoleTextArea.setEditable(false); // Użytkownik ma tylko czytać, nie pisać
-        consoleTextArea.setText("Tutaj pojawi się błąd z konsoli po kliknięciu 'Zczytaj'...");
+        consoleTextArea.setEditable(false);
+        consoleTextArea.setText("Select an error in the console or editor -> Right Click -> 'AI Explainer: Analyze Error'");
         mainPanel.add(new JBScrollPane(consoleTextArea), BorderLayout.CENTER);
 
-        // 3. Tworzymy panel na przyciski (na dole)
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JButton fetchLogsButton = new JButton("1. Fetch Console Logs");
-        JButton sendToAiButton = new JButton("2. Analyze with AI");
-        sendToAiButton.setEnabled(false); // Wyłączony, dopóki nie mamy logów
+        JButton sendToAiButton = new JButton("Analyze with AI");
+        sendToAiButton.setEnabled(false);
 
-        buttonPanel.add(fetchLogsButton);
+        // Mała etykieta informująca, czy załączono kontekst z kodem
+        JLabel contextLabel = new JLabel("Context: None");
+        contextLabel.setForeground(JBColor.GRAY);
+
         buttonPanel.add(sendToAiButton);
+        buttonPanel.add(contextLabel);
         mainPanel.add(buttonPanel, BorderLayout.SOUTH);
 
-        // --- LOGIKA PRZYCISKÓW ---
+        // --- NASŁUCHIWANIE DANYCH Z PRAWIEGO PRZYCISKU ---
+        SharedStateService sharedState = project.getService(SharedStateService.class);
 
-        // Logika przycisku Zczytaj
-        fetchLogsButton.addActionListener(e -> {
-            // Szukamy aktywnej konsoli w projekcie
-            RunContentDescriptor activeConsole = ExecutionManager.getInstance(project).getContentManager().getSelectedContent();
+        sharedState.setOnDataUpdatedCallback(() -> {
+            consoleTextArea.setText(sharedState.getErrorMessage());
 
-            if (activeConsole != null && activeConsole.getExecutionConsole() != null) {
-                // Konwersja obiektu konsoli do stringa (magia SDK)
-                // W prawdziwym projekcie używamy tu strumieni, ale do MVP to wystarczy
-                String consoleText = activeConsole.getExecutionConsole().getComponent().getAccessibleContext().getAccessibleName();
-
-                // Czasami ten obiekt jest pusty, jeśli tak, używamy hacka:
-                if (consoleText == null || consoleText.isEmpty()) {
-                    consoleText = "Skopiuj i wklej tu błąd, auto-detekcja w tym oknie nie zadziałała. \n (Ale tu zrobimy HTTP request do AI!)";
-                    consoleTextArea.setEditable(true);
-                }
-
-                consoleTextArea.setText(consoleText);
-                sendToAiButton.setEnabled(true); // Włączamy przycisk AI
+            // Sprawdzamy, czy wstrzyknięto kod
+            if (sharedState.getSourceCode() != null && !sharedState.getSourceCode().isEmpty()) {
+                contextLabel.setText("Context: Source code attached \u2705"); // Znacznik zielonego ptaszka
+                contextLabel.setForeground(new Color(0, 150, 0));
             } else {
-                consoleTextArea.setText("Nie znaleziono aktywnej konsoli. Uruchom najpierw jakiś program!");
+                contextLabel.setText("Context: No source code \u274C"); // Znacznik czerwonego X
+                contextLabel.setForeground(Color.RED);
             }
+            sendToAiButton.setEnabled(true);
         });
 
-        // Logika przycisku Analizuj (Tutaj podepniemy API!)
+        // --- LOGIKA ANALIZY ---
         sendToAiButton.addActionListener(e -> {
-            String textToSend = consoleTextArea.getText();
+            // Pobieramy obie wartości z naszego serwisu
+            String errorMessage = sharedState.getErrorMessage();
+            String sourceCode = sharedState.getSourceCode();
+
             String apiKey = AiExplainerSettingsState.getInstance().apiKey;
             String providerName = AiExplainerSettingsState.getInstance().aiProvider;
 
             if (apiKey == null || apiKey.trim().isEmpty()) {
-                consoleTextArea.setText("Brak klucza API! Wejdź w Ustawienia.");
+                consoleTextArea.setText("API Key is missing! Please configure it in Settings.");
                 return;
             }
 
             sendToAiButton.setEnabled(false);
-            consoleTextArea.setText(consoleTextArea.getText() + "\n\n=== AI THINKING ===");
+            consoleTextArea.setText(errorMessage + "\n\n=== AI THINKING... ===");
 
-            // 1. Fabryka daje nam odpowiedni obiekt
             AiProvider aiProvider = AiProviderFactory.getProvider(providerName);
 
-            // 2. Wywołujemy zunifikowaną metodę
-            aiProvider.analyzeError(textToSend, apiKey)
-                    .thenAccept(jsonResponseString -> {
+            // TUTAJ NAPRAWIONO BŁĄD: Przekazujemy wszystkie 3 argumenty
+            aiProvider.analyzeError(errorMessage, sourceCode, apiKey)
+                    .thenAccept(response -> {
                         SwingUtilities.invokeLater(() -> {
                             try {
-                                // Parsujemy odpowiedź AI, która dzięki naszemu promptowi jest teraz poprawnym JSONem!
-                                JsonObject aiAnswerJson = new Gson().fromJson(jsonResponseString, JsonObject.class);
-
+                                JsonObject aiAnswerJson = new Gson().fromJson(response, JsonObject.class);
                                 String summary = aiAnswerJson.get("errorSummary").getAsString();
                                 String cause = aiAnswerJson.get("rootCause").getAsString();
                                 String fix = aiAnswerJson.get("suggestedFix").getAsString();
 
-                                // Formatujemy ładny tekst w oknie
-                                String formattedOutput = textToSend +
+                                String formattedOutput = errorMessage +
                                         "\n\n=== AI ANALYSIS ===\n" +
-                                        "🛑 SUMMARY: " + summary + "\n\n" +
-                                        "🔍 CAUSE: " + cause + "\n\n" +
-                                        "🛠️ FIX: " + fix;
+                                        "\uD83D\uDED1 SUMMARY: " + summary + "\n\n" + // Stop sign
+                                        "\uD83D\uDD0D CAUSE: " + cause + "\n\n" + // Magnifying glass
+                                        "\uD83D\uDEE0\uFE0F FIX: " + fix; // Tools
 
                                 consoleTextArea.setText(formattedOutput);
-                                sendToAiButton.setEnabled(true);
                             } catch (Exception parseEx) {
-                                // Fallback, na wypadek gdyby model zignorował instrukcję i wypisał zwykły tekst
-                                consoleTextArea.setText(textToSend + "\n\n=== AI RESPONSE ===\n" + jsonResponseString);
-                                sendToAiButton.setEnabled(true);
+                                // Fallback w razie dziwnej odpowiedzi
+                                consoleTextArea.setText(errorMessage + "\n\n=== AI RESPONSE ===\n" + response);
                             }
+                            sendToAiButton.setEnabled(true);
                         });
-                    }).exceptionally(ex -> {
+                    })
+                    .exceptionally(ex -> {
                         SwingUtilities.invokeLater(() -> {
-                            consoleTextArea.setText(textToSend + "\n\n=== BŁĄD WTYCZKI ===\n" + ex.getMessage());
+                            consoleTextArea.setText(errorMessage + "\n\n=== PLUGIN ERROR ===\n" + ex.getMessage());
                             sendToAiButton.setEnabled(true);
                         });
                         return null;
                     });
         });
 
-        // 4. Dodanie naszego panelu do środowiska IntelliJ
         Content content = ContentFactory.getInstance().createContent(mainPanel, "", false);
         toolWindow.getContentManager().addContent(content);
     }

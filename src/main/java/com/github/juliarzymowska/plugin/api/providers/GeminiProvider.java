@@ -13,9 +13,16 @@ public class GeminiProvider extends BaseAiProvider {
     private static final Gson gson = new Gson();
 
     @Override
-    protected HttpRequest buildHttpRequest(String errorMessage, String apiKey) {
+    protected HttpRequest buildHttpRequest(String errorMessage, String sourceCode, String apiKey) {
         String apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=" + apiKey;
-        String formattedPrompt = String.format(PromptTemplates.ANALYZE_ERROR_PROMPT, errorMessage);
+
+        // Safety check in case source code is empty or null
+        String finalSourceCode = (sourceCode != null && !sourceCode.trim().isEmpty())
+                ? sourceCode
+                : "No source code provided. Analyze based on the error message alone.";
+
+        // Wstrzykujemy OBA parametry do prompta
+        String formattedPrompt = String.format(PromptTemplates.ANALYZE_ERROR_PROMPT, errorMessage, finalSourceCode);
 
         // Czyste wywołanie wydzielonej metody
         JsonObject requestBody = buildRequestBody(formattedPrompt);

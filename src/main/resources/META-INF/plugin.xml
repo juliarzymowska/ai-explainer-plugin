@@ -1,24 +1,43 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <id>com.github.juliarzymowska.aiconsolelogexplainer</id>
-    <name>AI Console Log Explainer</name>
-    <vendor>juliarzymowska</vendor>
+    <id>com.github.juliarzymowska.plugin.aiexplainer</id>
+    <name>AI Console Explainer</name>
+    <vendor email="twoj@email.com" url="https://www.twojastrona.com">Julia</vendor>
+
     <description><![CDATA[
-        <p><b>AI Console Log Explainer</b> integrates LLMs directly into the IDE run console.</p>
-        <p>Right-click any error message or stack trace to get an instant AI-generated explanation and suggested fix, streamlining the debugging process without leaving the IDE.</p>
+      Narzędzie do inteligentnej analizy błędów z konsoli z wstrzykiwaniem kontekstu kodu źródłowego.
     ]]></description>
 
+    <!-- To mówi IDE, że wtyczka wymaga projektów Java -->
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="AI Console Log Explainer" anchor="bottom"
-                    factoryClass="com.github.juliarzymowska.plugin.toolWindow.AiToolWindowFactory"/>
-
+        <!-- 1. Rejestracja serwisu ustawień (Klucz API) -->
         <applicationService serviceImplementation="com.github.juliarzymowska.plugin.settings.AiExplainerSettingsState"/>
-
-        <applicationConfigurable parentId="tools"
-                                 instance="com.github.juliarzymowska.plugin.settings.AiExplainerConfigurable"
+        <applicationConfigurable parentId="tools" instance="com.github.juliarzymowska.plugin.settings.AiExplainerConfigurable"
                                  id="com.github.juliarzymowska.plugin.settings.AiExplainerConfigurable"
                                  displayName="AI Explainer"/>
+
+        <!-- 2. Rejestracja naszego nowego Serwisu Przekazywania Stanu (Kuriera) -->
+        <projectService serviceImplementation="com.github.juliarzymowska.plugin.services.SharedStateService"/>
+
+        <!-- 3. Nasza zakładka na dole ekranu -->
+        <toolWindow id="AI Explainer" secondary="true" anchor="bottom"
+                    factoryClass="com.github.juliarzymowska.plugin.toolWindow.AiToolWindowFactory"/>
     </extensions>
+
+    <!-- 4. Rejestracja akcji pod prawym przyciskiem myszy -->
+    <actions>
+        <action id="SendToAiAction"
+                class="com.github.juliarzymowska.plugin.actions.SendToAiAction"
+                text="AI Explainer: Analyze Error"
+                description="Sends selected error and source code to the AI tool window">
+
+            <!-- Dodaje akcję do menu konsoli Run/Terminala -->
+            <add-to-group group-id="ConsoleEditorPopupMenu" anchor="last"/>
+            <!-- Dodaje akcję do standardowego edytora kodu -->
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>

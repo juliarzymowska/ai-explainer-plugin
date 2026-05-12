@@ -14,10 +14,16 @@ public class OpenAiProvider extends BaseAiProvider {
     private static final Gson gson = new Gson();
 
     @Override
-    protected HttpRequest buildHttpRequest(String errorMessage, String apiKey) {
-        String formattedPrompt = String.format(PromptTemplates.ANALYZE_ERROR_PROMPT, errorMessage);
+    protected HttpRequest buildHttpRequest(String errorMessage, String sourceCode, String apiKey) {
 
-        // ZOBACZ JAK CZYSTO: Wywołujemy tylko nową metodę
+        // Safety check in case source code is empty or null
+        String finalSourceCode = (sourceCode != null && !sourceCode.trim().isEmpty())
+                ? sourceCode
+                : "No source code provided. Analyze based on the error message alone.";
+
+        // Wstrzykujemy OBA parametry do prompta
+        String formattedPrompt = String.format(PromptTemplates.ANALYZE_ERROR_PROMPT, errorMessage, finalSourceCode);
+
         JsonObject requestBody = buildRequestBody(formattedPrompt);
 
         return HttpRequest.newBuilder()

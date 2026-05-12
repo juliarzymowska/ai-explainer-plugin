@@ -1,8 +1,4 @@
-package com.github.juliarzymowska.plugin.api;
-
-import com.github.juliarzymowska.plugin.api.providers.AiProvider;
-import com.github.juliarzymowska.plugin.api.providers.GeminiProvider;
-import com.github.juliarzymowska.plugin.api.providers.OpenAiProvider;
+package com.github.juliarzymowska.plugin.api.providers;
 
 public class AiProviderFactory {
     public static AiProvider getProvider(String providerName) {
