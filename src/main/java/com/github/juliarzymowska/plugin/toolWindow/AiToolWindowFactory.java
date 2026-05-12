@@ -10,10 +10,14 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.JBColor;
+import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentFactory;
+import com.intellij.ui.jcef.JBCefOsrHandlerBrowser;
 import org.jetbrains.annotations.NotNull;
+import org.commonmark.parser.Parser;
+import org.commonmark.renderer.html.HtmlRenderer;
 
 import javax.swing.*;
 import java.awt.*;
@@ -24,86 +28,104 @@ public class AiToolWindowFactory implements ToolWindowFactory {
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
         JPanel mainPanel = new JPanel(new BorderLayout());
 
-        JTextArea consoleTextArea = new JTextArea();
-        consoleTextArea.setEditable(false);
-        consoleTextArea.setText("Select an error in the console or editor -> Right Click -> 'AI Explainer: Analyze Error'");
-        mainPanel.add(new JBScrollPane(consoleTextArea), BorderLayout.CENTER);
+        // GÓRNY PANEL: Błąd i kontrolki
+        JPanel topPanel = new JPanel(new BorderLayout());
+        JTextArea errorTextArea = new JTextArea("Select an error -> Right Click -> 'AI Explainer: Analyze Error'");
+        errorTextArea.setEditable(false);
+        topPanel.add(new JBScrollPane(errorTextArea), BorderLayout.CENTER);
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton sendToAiButton = new JButton("Analyze with AI");
         sendToAiButton.setEnabled(false);
-
-        // Mała etykieta informująca, czy załączono kontekst z kodem
         JLabel contextLabel = new JLabel("Context: None");
         contextLabel.setForeground(JBColor.GRAY);
 
         buttonPanel.add(sendToAiButton);
         buttonPanel.add(contextLabel);
-        mainPanel.add(buttonPanel, BorderLayout.SOUTH);
+        topPanel.add(buttonPanel, BorderLayout.SOUTH);
 
-        // --- NASŁUCHIWANIE DANYCH Z PRAWIEGO PRZYCISKU ---
+        // DOLNY PANEL: Odpowiedź AI (obsługująca HTML dla lepszej czytelności!)
+        JEditorPane aiResponsePane = new JEditorPane();
+        aiResponsePane.setContentType("text/html");
+        aiResponsePane.setEditable(false);
+        aiResponsePane.setText("<html><body style='font-family: sans-serif; color: gray;'>Waiting for AI analysis...</body></html>");
+
+        // DZIELIMY EKRAN NA PÓŁ (Góra / Dół)
+        JBSplitter splitter = new JBSplitter(true, 0.4f); // 40% ekranu na górę, 60% na odpowiedź
+        splitter.setFirstComponent(topPanel);
+        splitter.setSecondComponent(new JBScrollPane(aiResponsePane));
+
+        mainPanel.add(splitter, BorderLayout.CENTER);
+
+        // --- NASŁUCHIWANIE DANYCH ---
         SharedStateService sharedState = project.getService(SharedStateService.class);
-
         sharedState.setOnDataUpdatedCallback(() -> {
-            consoleTextArea.setText(sharedState.getErrorMessage());
-
-            // Sprawdzamy, czy wstrzyknięto kod
+            errorTextArea.setText(sharedState.getErrorMessage());
             if (sharedState.getSourceCode() != null && !sharedState.getSourceCode().isEmpty()) {
-                contextLabel.setText("Context: Source code attached \u2705"); // Znacznik zielonego ptaszka
-                contextLabel.setForeground(new Color(0, 150, 0));
+                contextLabel.setText("Context: Source code attached ✅");
+                contextLabel.setForeground(JBColor.GREEN);
             } else {
-                contextLabel.setText("Context: No source code \u274C"); // Znacznik czerwonego X
-                contextLabel.setForeground(Color.RED);
+                contextLabel.setText("Context: No source code ❌");
+                contextLabel.setForeground(JBColor.RED);
             }
             sendToAiButton.setEnabled(true);
         });
 
         // --- LOGIKA ANALIZY ---
         sendToAiButton.addActionListener(e -> {
-            // Pobieramy obie wartości z naszego serwisu
             String errorMessage = sharedState.getErrorMessage();
             String sourceCode = sharedState.getSourceCode();
-
             String apiKey = AiExplainerSettingsState.getInstance().apiKey;
             String providerName = AiExplainerSettingsState.getInstance().aiProvider;
 
             if (apiKey == null || apiKey.trim().isEmpty()) {
-                consoleTextArea.setText("API Key is missing! Please configure it in Settings.");
+                aiResponsePane.setText("<html><body style='color: red;'>API Key is missing! Please configure it in Settings.</body></html>");
                 return;
             }
 
             sendToAiButton.setEnabled(false);
-            consoleTextArea.setText(errorMessage + "\n\n=== AI THINKING... ===");
+            aiResponsePane.setText("<html><body style='font-family: sans-serif;'><i>AI is thinking... ⏳</i></body></html>");
 
             AiProvider aiProvider = AiProviderFactory.getProvider(providerName);
-
-            // TUTAJ NAPRAWIONO BŁĄD: Przekazujemy wszystkie 3 argumenty
             aiProvider.analyzeError(errorMessage, sourceCode, apiKey)
                     .thenAccept(response -> {
                         SwingUtilities.invokeLater(() -> {
                             try {
                                 JsonObject aiAnswerJson = new Gson().fromJson(response, JsonObject.class);
-                                String summary = aiAnswerJson.get("errorSummary").getAsString();
-                                String cause = aiAnswerJson.get("rootCause").getAsString();
-                                String fix = aiAnswerJson.get("suggestedFix").getAsString();
+                                String summaryMd = aiAnswerJson.get("errorSummary").getAsString();
+                                String causeMd = aiAnswerJson.get("rootCause").getAsString();
+                                String fixMd = aiAnswerJson.get("suggestedFix").getAsString();
 
-                                String formattedOutput = errorMessage +
-                                        "\n\n=== AI ANALYSIS ===\n" +
-                                        "\uD83D\uDED1 SUMMARY: " + summary + "\n\n" + // Stop sign
-                                        "\uD83D\uDD0D CAUSE: " + cause + "\n\n" + // Magnifying glass
-                                        "\uD83D\uDEE0\uFE0F FIX: " + fix; // Tools
+                                // MAGIA MARKDOWN: Tworzymy tłumacza
+                                Parser parser = Parser.builder().build();
+                                HtmlRenderer renderer = HtmlRenderer.builder().build();
 
-                                consoleTextArea.setText(formattedOutput);
+                                // Tłumaczymy wartości Markdown od AI na czysty HTML!
+                                String summaryHtml = renderer.render(parser.parse(summaryMd));
+                                String causeHtml = renderer.render(parser.parse(causeMd));
+                                String fixHtml = renderer.render(parser.parse(fixMd));
+
+                                // FORMATOWANIE GŁÓWNE
+                                // Dodajemy trochę CSS, żeby bloki kodu (<code>) ładnie wyglądały na szaro
+                                String htmlOutput = "<html><head><style>" +
+                                        "code { background-color: rgba(128, 128, 128, 0.2); padding: 2px 4px; border-radius: 4px; font-family: monospace; }" +
+                                        "pre { background-color: rgba(128, 128, 128, 0.1); padding: 8px; border-radius: 4px; border: 1px solid rgba(128, 128, 128, 0.2); }" +                                        "pre { background-color: #f5f5f5; padding: 8px; border-radius: 4px; }" +
+                                        "</style></head><body style='font-family: sans-serif; padding: 10px;'>" +
+                                        "<h3 style='color: #d9534f;'>🛑 SUMMARY</h3>" + summaryHtml +
+                                        "<h3 style='color: #f0ad4e;'>🔍 CAUSE</h3>" + causeHtml +
+                                        "<h3 style='color: #5cb85c;'>🛠️ FIX</h3>" + fixHtml +
+                                        "</body></html>";
+
+                                aiResponsePane.setText(htmlOutput);
                             } catch (Exception parseEx) {
-                                // Fallback w razie dziwnej odpowiedzi
-                                consoleTextArea.setText(errorMessage + "\n\n=== AI RESPONSE ===\n" + response);
+                                aiResponsePane.setText("<html><body><pre>" + response + "</pre></body></html>");
                             }
                             sendToAiButton.setEnabled(true);
                         });
                     })
                     .exceptionally(ex -> {
                         SwingUtilities.invokeLater(() -> {
-                            consoleTextArea.setText(errorMessage + "\n\n=== PLUGIN ERROR ===\n" + ex.getMessage());
+                            aiResponsePane.setText("<html><body style='color: red;'><b>PLUGIN ERROR:</b><br>" + ex.getMessage() + "</body></html>");
                             sendToAiButton.setEnabled(true);
                         });
                         return null;

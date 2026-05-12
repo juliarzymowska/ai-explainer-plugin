@@ -2,28 +2,34 @@ package com.github.juliarzymowska.plugin.api;
 
 public final class PromptTemplates {
 
-    private PromptTemplates() {}
+    private PromptTemplates() {
+    }
 
     public static final String ANALYZE_ERROR_PROMPT = """
-            You are a Senior Software Engineer helping a colleague debug their application.
-            Analyze the following console error, along with the relevant source code, and provide a clear, structured solution.
+                        You are a Senior Software Engineer helping a colleague debug their application.
+                        Analyze the following console error, along with the relevant source code.
             
-            CONSOLE ERROR / STACK TRACE:
-            %s
+                        CONSOLE ERROR:
+                        %s
             
-            RELEVANT SOURCE CODE (if found):
-            %s
+                        SOURCE CODE:
+                        %s
             
-            TASK:
-            1. Identify the exact line or component causing the crash based on the provided code.
-            2. Explain the root cause in simple terms.
-            3. Provide a concrete, actionable fix.
+                        TASK:
+                        1. Identify the exact line or component causing the crash.
+                        2. Explain the root cause in simple terms.
+                        3. Provide a concrete, actionable fix.
             
-            OUTPUT FORMAT (JSON only, no markdown blocks, no other text):
-            {
-              "errorSummary": "One sentence summary of what went wrong",
-              "rootCause": "Detailed explanation of why it happened",
-              "suggestedFix": "Step-by-step instructions to resolve the issue"
-            }
+                        IMPORTANT FORMATTING RULES:
+                        - Output MUST be strict JSON.
+                        - Inside the JSON string values, use rich Markdown formatting (e.g., **bolding**, `inline code`, or ```java code blocks
+            ```) to make it highly readable.
+            
+                        OUTPUT FORMAT (JSON only):
+                        {
+                          "errorSummary": "One sentence summary with Markdown",
+                          "rootCause": "Detailed explanation using Markdown lists and bold text",
+                          "suggestedFix": "Step-by-step fix with Markdown code snippets"
+                        }
             """;
 }
