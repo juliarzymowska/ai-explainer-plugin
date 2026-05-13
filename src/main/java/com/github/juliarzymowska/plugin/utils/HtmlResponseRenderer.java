@@ -14,7 +14,7 @@ public class HtmlResponseRenderer {
     private static final String CSS_STYLE = "<style>" +
             "code { background-color: rgba(128, 128, 128, 0.2); padding: 2px 4px; border-radius: 4px; font-family: monospace; }" +
             "pre { background-color: rgba(128, 128, 128, 0.1); padding: 8px; border-radius: 4px; }" +
-            "h3 { margin-bottom: 5px; }" +
+            "h2 { margin-bottom: 5px; }" +
             "</style>";
 
     public static String render(String rawJsonResponse) {
@@ -26,12 +26,13 @@ public class HtmlResponseRenderer {
             String fixHtml = htmlRenderer.render(mdParser.parse(json.get("suggestedFix").getAsString()));
 
             return "<html><head>" + CSS_STYLE + "</head><body style='font-family: sans-serif; padding: 10px;'>" +
-                    "<h3 style='color: #d9534f;'>🛑 SUMMARY</h3>" + summaryHtml +
-                    "<h3 style='color: #f0ad4e;'>🔍 CAUSE</h3>" + causeHtml +
-                    "<h3 style='color: #5cb85c;'>🛠️ FIX</h3>" + fixHtml +
+                    "<h2 style='color: #d9534f;'>SUMMARY</h3>" + summaryHtml +
+                    "<h2 style='color: #f0ad4e;'>CAUSE</h3>" + causeHtml +
+                    "<h2 style='color: #5cb85c;'>FIX</h3>" + fixHtml +
                     "</body></html>";
 
         } catch (Exception e) {
+            System.err.println("CRITICAL RENDERER ERROR: " + e.getMessage());
             return "<html><body style='padding: 10px;'><pre>" + rawJsonResponse + "</pre></body></html>";
         }
     }
