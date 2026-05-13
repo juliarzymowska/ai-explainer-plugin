@@ -6,65 +6,57 @@ import com.intellij.ui.components.JBPasswordField;
 import com.intellij.util.ui.FormBuilder;
 
 import javax.swing.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class AiExplainerSettingsComponent {
 
     private final JPanel mainPanel;
-    private final ComboBox<String> activeProviderDropdown = new ComboBox<>(new String[]{"Gemini", "OpenAI"});
-    private final JBPasswordField openAiKeyText = new JBPasswordField();
-    private final JBPasswordField geminiKeyText = new JBPasswordField();
-    private final ComboBox<String> geminiModelDropdown = new ComboBox<>(new String[]{"gemini-3.1-flash-lite", "gemini-3.1-pro"});
+    private final ComboBox<String> geminiModelDropdown = new ComboBox<>(new String[]{"gemini-3.1-flash-lite", "gemini-3.1-pro-preview"});
+
+    // Lista wspieranych dostawców (dodanie tu "Claude" załatwi sprawę w przyszłości!)
+    public static final List<String> PROVIDERS = List.of("OpenAI", "Gemini");
+
+    // Mapa trzymająca dynamicznie wygenerowane pola haseł
+    private final Map<String, JBPasswordField> apiKeysFields = new HashMap<>();
 
     public AiExplainerSettingsComponent() {
-        mainPanel = FormBuilder.createFormBuilder()
-                .addLabeledComponent(new JBLabel("Active AI Provider:"), activeProviderDropdown, 1, false)
-                .addSeparator()
-                .addLabeledComponent(new JBLabel("OpenAI API Key:"), openAiKeyText, 1, false)
-                .addLabeledComponent(new JBLabel("Gemini API Key:"), geminiKeyText, 1, false)
-                .addLabeledComponent(new JBLabel("Gemini model:"), geminiModelDropdown, 1, false)
-                .addComponentFillVertically(new JPanel(), 0)
-                .getPanel();
+        FormBuilder builder = FormBuilder.createFormBuilder();
+
+        // Dynamiczne budowanie pól dla każdego providera
+        for (String provider : PROVIDERS) {
+            JBPasswordField passwordField = new JBPasswordField();
+            apiKeysFields.put(provider, passwordField);
+            builder.addLabeledComponent(new JBLabel(provider + " API Key:"), passwordField, 1, false);
+        }
+
+        builder.addSeparator()
+                .addLabeledComponent(new JBLabel("Gemini Model:"), geminiModelDropdown, 1, false)
+                .addComponentFillVertically(new JPanel(), 0);
+
+        mainPanel = builder.getPanel();
     }
 
-    public JPanel getPanel() {
-        return mainPanel;
+    public JPanel getPanel() { return mainPanel; }
+    public JComponent getPreferredFocusedComponent() { return apiKeysFields.get(PROVIDERS.get(0)); }
+
+    // Dwie potężne metody zamiast kilkunastu getterów i setterów
+    public Map<String, String> getApiKeys() {
+        Map<String, String> keys = new HashMap<>();
+        apiKeysFields.forEach((provider, field) -> keys.put(provider, new String(field.getPassword())));
+        return keys;
     }
 
-    public JComponent getPreferredFocusedComponent() {
-        return activeProviderDropdown;
+    public void setApiKeys(Map<String, String> keys) {
+        keys.forEach((provider, key) -> {
+            if (apiKeysFields.containsKey(provider)) {
+                apiKeysFields.get(provider).setText(key);
+            }
+        });
     }
 
-    // Getters
-    public String getActiveProvider() {
-        return (String) activeProviderDropdown.getSelectedItem();
-    }
-
-    public String getOpenAiApiKey() {
-        return new String(openAiKeyText.getPassword());
-    }
-
-    public String getGeminiApiKey() {
-        return new String(geminiKeyText.getPassword());
-    }
-
-    public String getGeminiModel() {
-        return (String) geminiModelDropdown.getSelectedItem();
-    }
-
-    // Setters
-    public void setActiveProvider(String provider) {
-        activeProviderDropdown.setSelectedItem(provider);
-    }
-
-    public void setOpenAiApiKey(String key) {
-        openAiKeyText.setText(key);
-    }
-
-    public void setGeminiApiKey(String key) {
-        geminiKeyText.setText(key);
-    }
-
-    public void setGeminiModel(String model) {
-        geminiModelDropdown.setSelectedItem(model);
-    }
+    // Ustawienia bezpieczne
+    public String getGeminiModel() { return (String) geminiModelDropdown.getSelectedItem(); }
+    public void setGeminiModel(String model) { geminiModelDropdown.setSelectedItem(model); }
 }

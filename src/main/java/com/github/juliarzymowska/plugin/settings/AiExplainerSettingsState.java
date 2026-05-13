@@ -13,10 +13,6 @@ import org.jetbrains.annotations.Nullable;
 )
 public class AiExplainerSettingsState implements PersistentStateComponent<AiExplainerSettingsState> {
 
-    // Nowa struktura danych
-    public String activeProvider = "Gemini";
-    public String openAiApiKey = "";
-    public String geminiApiKey = "";
     public String geminiModel = "gemini-3.1-flash-lite";
 
     public static AiExplainerSettingsState getInstance() {
@@ -25,12 +21,8 @@ public class AiExplainerSettingsState implements PersistentStateComponent<AiExpl
 
     @Nullable
     @Override
-    public AiExplainerSettingsState getState() {
-        return this;
-    }
+    public AiExplainerSettingsState getState() { return this; }
 
     @Override
-    public void loadState(AiExplainerSettingsState state) {
-        XmlSerializerUtil.copyBean(state, this);
-    }
+    public void loadState(AiExplainerSettingsState state) { XmlSerializerUtil.copyBean(state, this); }
 }

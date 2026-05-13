@@ -3,15 +3,12 @@ package com.github.juliarzymowska.plugin.toolWindow;
 import com.github.juliarzymowska.plugin.api.providers.AiProvider;
 import com.github.juliarzymowska.plugin.api.providers.AiProviderFactory;
 import com.github.juliarzymowska.plugin.services.SharedStateService;
-import com.github.juliarzymowska.plugin.settings.AiExplainerSettingsState;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
+import com.github.juliarzymowska.plugin.settings.ApiKeyManager;
+import com.github.juliarzymowska.plugin.utils.HtmlResponseRenderer;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBScrollPane;
-import org.commonmark.parser.Parser;
-import org.commonmark.renderer.html.HtmlRenderer;
 
 import javax.swing.*;
 import java.awt.*;
@@ -24,9 +21,6 @@ public class AiToolWindowPanel extends JPanel {
     private final JButton sendToAiButton;
     private final JLabel contextLabel;
     private final ComboBox<String> providerSelector;
-
-    private final Parser mdParser = Parser.builder().build();
-    private final HtmlRenderer htmlRenderer = HtmlRenderer.builder().build();
 
     public AiToolWindowPanel(Project project) {
         this.project = project;
@@ -41,7 +35,7 @@ public class AiToolWindowPanel extends JPanel {
 
         // Provider Selector (Quick Access)
         providerSelector = new ComboBox<>(new String[]{"Gemini", "OpenAI"});
-        providerSelector.setSelectedItem(AiExplainerSettingsState.getInstance().activeProvider);
+        providerSelector.setSelectedIndex(0); // Ustawiamy Gemini jako domyślne przy starcie
 
         sendToAiButton = new JButton("Analyze with AI");
         sendToAiButton.setEnabled(false);
@@ -50,7 +44,7 @@ public class AiToolWindowPanel extends JPanel {
         contextLabel.setForeground(Color.GRAY);
 
         controlsPanel.add(new JLabel("Provider:"));
-        controlsPanel.add(providerSelector);
+        controlsPanel.add(providerSelector); // Odkomentowane - przycisk wróci do interfejsu!
         controlsPanel.add(sendToAiButton);
         controlsPanel.add(contextLabel);
 
@@ -95,10 +89,10 @@ public class AiToolWindowPanel extends JPanel {
 
     private void performAnalysis() {
         SharedStateService sharedState = project.getService(SharedStateService.class);
-        AiExplainerSettingsState settings = AiExplainerSettingsState.getInstance();
 
+        // Zamiast grzebać w starym State, pobieramy dostawcę z UI i strzelamy do bezpiecznego sejfu
         String selectedProvider = (String) providerSelector.getSelectedItem();
-        String apiKey = "Gemini".equals(selectedProvider) ? settings.geminiApiKey : settings.openAiApiKey;
+        String apiKey = ApiKeyManager.getKey(selectedProvider);
 
         if (apiKey == null || apiKey.trim().isEmpty()) {
             updateAiResponse("<html><body style='color: red; padding: 10px;'><b>Error:</b> API Key for " + selectedProvider + " is missing in Settings!</body></html>");
@@ -121,26 +115,8 @@ public class AiToolWindowPanel extends JPanel {
     }
 
     private void handleAiResponse(String response, String originalError) {
-        try {
-            JsonObject json = new Gson().fromJson(response, JsonObject.class);
-            String summaryHtml = htmlRenderer.render(mdParser.parse(json.get("errorSummary").getAsString()));
-            String causeHtml = htmlRenderer.render(mdParser.parse(json.get("rootCause").getAsString()));
-            String fixHtml = htmlRenderer.render(mdParser.parse(json.get("suggestedFix").getAsString()));
-
-            String finalHtml = "<html><head><style>" +
-                    "code { background-color: rgba(128, 128, 128, 0.2); padding: 2px 4px; border-radius: 4px; font-family: monospace; }" +
-                    "pre { background-color: rgba(128, 128, 128, 0.1); padding: 8px; border-radius: 4px; }" +
-                    "h3 { margin-bottom: 5px; }" +
-                    "</style></head><body style='font-family: sans-serif; padding: 10px;'>" +
-                    "<h3 style='color: #d9534f;'>🛑 SUMMARY</h3>" + summaryHtml +
-                    "<h3 style='color: #f0ad4e;'>🔍 CAUSE</h3>" + causeHtml +
-                    "<h3 style='color: #5cb85c;'>🛠️ FIX</h3>" + fixHtml +
-                    "</body></html>";
-
-            updateAiResponse(finalHtml);
-        } catch (Exception e) {
-            updateAiResponse("<html><body style='padding: 10px;'><pre>" + response + "</pre></body></html>");
-        }
+        String finalHtml = HtmlResponseRenderer.render(response);
+        updateAiResponse(finalHtml);
         sendToAiButton.setEnabled(true);
     }
 
