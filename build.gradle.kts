@@ -1,7 +1,7 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
-    id("java") // Added standard Java plugin
+    id("java")
     id("org.jetbrains.intellij.platform")
     id("org.jetbrains.changelog")
 }
@@ -12,13 +12,28 @@ java {
     }
 }
 
+repositories {
+    mavenCentral()
+    intellijPlatform {
+        defaultRepositories()
+    }
+}
+
 dependencies {
     testImplementation("junit:junit:4.13.2")
     implementation("org.commonmark:commonmark:0.21.0")
-    // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
+
     intellijPlatform {
         intellijIdea("2025.2.6.2")
         testFramework(TestFrameworkType.Platform)
         bundledPlugins("com.intellij.java")
+    }
+}
+
+intellijPlatform {
+    pluginVerification {
+        ides {
+            current()
+        }
     }
 }
