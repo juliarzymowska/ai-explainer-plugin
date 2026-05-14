@@ -1,12 +1,14 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <id>com.github.juliarzymowska.plugin.aiexplainer</id>
-    <name>AI Console Explainer</name>
+    <name>AI Explainer</name>
     <vendor email="juliarzymowska9@gmail.com" url="https://juliarzymowska.github.io/" >Julia Rzymowska</vendor>
 
     <description><![CDATA[
       An intelligent tool for analyzing console errors and stack traces with automated source code context injection.
     ]]></description>
+
+    <idea-version since-build="242"/>
 
     <!-- Indicates that this plugin requires the core platform and Java modules to function -->
     <depends>com.intellij.modules.platform</depends>
