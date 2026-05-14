@@ -20,7 +20,9 @@ public class SharedStateServiceTest extends BasePlatformTestCase {
         // 2. THEN, clean up the state to prevent State Pollution
         stateService.setState("", "");
         stateService.setOnDataUpdatedCallback(null);
-    }    public void testInitialStateIsEmpty() {
+    }
+
+    public void testInitialStateIsEmpty() {
         // When a project is first opened, our service should have empty strings, not nulls
         assertEquals("", stateService.getErrorMessage());
         assertEquals("", stateService.getSourceCode());
