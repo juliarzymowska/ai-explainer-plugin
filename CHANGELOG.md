@@ -1,5 +1,10 @@
 # AI Console Explainer Changelog
 
+## [Unreleased]
+### Added
+
+- ...
+
 ## [1.0.0]
 ### Added
 - **AI Explainer Tool Window:** Introduced a dedicated tool window for analyzing stack traces and console errors.
