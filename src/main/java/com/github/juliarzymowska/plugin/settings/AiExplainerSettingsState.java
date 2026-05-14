@@ -1,11 +1,15 @@
 package com.github.juliarzymowska.plugin.settings;
 
+import com.github.juliarzymowska.plugin.api.providers.AiProviderType;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Manages the persistent, non-sensitive state of the plugin's settings.
@@ -20,8 +24,20 @@ import org.jetbrains.annotations.Nullable;
 )
 public class AiExplainerSettingsState implements PersistentStateComponent<AiExplainerSettingsState> {
 
-    /** The default Gemini model selected by the user. */
-    public String geminiModel = "gemini-3.1-flash-lite";
+    /**
+     * A map storing the selected model for each provider.
+     * The key is the Enum name (e.g., "GEMINI", "OPENAI"), and the value is the model string.
+     */
+    public Map<String, String> selectedModels = new HashMap<>();
+
+    public AiExplainerSettingsState() {
+        // Automatically populate default models based on the Enum definitions
+        for (AiProviderType type : AiProviderType.values()) {
+            if (!type.getSupportedModels().isEmpty()) {
+                selectedModels.put(type.name(), type.getSupportedModels().get(0));
+            }
+        }
+    }
 
     /**
      * Retrieves the application-level instance of this settings state.

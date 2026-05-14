@@ -2,6 +2,7 @@ package com.github.juliarzymowska.plugin.toolWindow;
 
 import com.github.juliarzymowska.plugin.api.providers.AiProvider;
 import com.github.juliarzymowska.plugin.api.providers.AiProviderFactory;
+import com.github.juliarzymowska.plugin.api.providers.AiProviderType;
 import com.github.juliarzymowska.plugin.services.SharedStateService;
 import com.github.juliarzymowska.plugin.settings.ApiKeyManager;
 import com.github.juliarzymowska.plugin.utils.HtmlResponseRenderer;
@@ -50,9 +51,11 @@ public class AiToolWindowPanel extends JPanel {
 
         JPanel controlsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 
-        providerSelector = new ComboBox<>(new String[]{"Gemini", "OpenAI"});
+        String[] providerNames = java.util.Arrays.stream(AiProviderType.values())
+                .map(AiProviderType::getDisplayName)
+                .toArray(String[]::new);
+        providerSelector = new ComboBox<>(providerNames);
         providerSelector.setSelectedIndex(0);
-
         sendToAiButton = new JButton("Analyze with AI");
         sendToAiButton.setEnabled(false);
 
@@ -126,6 +129,7 @@ public class AiToolWindowPanel extends JPanel {
     private void performAnalysis() {
         SharedStateService sharedState = project.getService(SharedStateService.class);
         String selectedProvider = (String) providerSelector.getSelectedItem();
+        AiProviderType type = AiProviderType.fromDisplayName(selectedProvider);
         String apiKey = ApiKeyManager.getKey(selectedProvider);
 
         if (apiKey == null || apiKey.trim().isEmpty()) {
@@ -138,7 +142,7 @@ public class AiToolWindowPanel extends JPanel {
         stopButton.setEnabled(true);
         updateAiResponse("<html><body style='font-family: sans-serif; padding: 10px;'><i>AI is thinking... \u23F3</i></body></html>");
 
-        AiProvider aiProvider = AiProviderFactory.getProvider(selectedProvider);
+        AiProvider aiProvider = AiProviderFactory.getProvider(type);
 
         currentAnalysisFuture = aiProvider.analyzeError(sharedState.getErrorMessage(), sharedState.getSourceCode(), apiKey);
 

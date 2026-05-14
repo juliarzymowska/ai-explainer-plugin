@@ -16,16 +16,14 @@ public class AiProviderFactory {
      * Currently supports "OpenAI". If the provided name does not match any explicitly
      * defined provider, the factory defaults to returning a {@link GeminiProvider}.
      *
-     * @param providerName The name of the AI service provider (e.g., "OpenAI", "Gemini")
+     * @param type The name of the AI service provider (e.g., "OpenAI", "Gemini")
      *                     selected by the user in the plugin settings.
      * @return An instance of the requested {@link AiProvider}.
      */
-    public static AiProvider getProvider(String providerName) {
-        if ("OpenAI".equalsIgnoreCase(providerName)) {
+    public static AiProvider getProvider(AiProviderType type) {
+        if (type == AiProviderType.OPENAI) {
             return new OpenAiProvider();
         }
-
         // Default fallback
         return new GeminiProvider();
-    }
-}
+    }}

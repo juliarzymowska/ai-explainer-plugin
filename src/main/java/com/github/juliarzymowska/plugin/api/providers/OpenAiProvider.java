@@ -1,9 +1,11 @@
 package com.github.juliarzymowska.plugin.api.providers;
 
 import com.github.juliarzymowska.plugin.api.PromptTemplates;
+import com.github.juliarzymowska.plugin.settings.AiExplainerSettingsState;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import org.jetbrains.annotations.NotNull;
 
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -34,13 +36,18 @@ public class OpenAiProvider extends BaseAiProvider {
      */
     @Override
     protected HttpRequest buildHttpRequest(String errorMessage, String sourceCode, String apiKey) {
+        // 1. Fetch the model dynamically from the centralized settings state
+        String selectedModel = AiExplainerSettingsState.getInstance()
+                .selectedModels.getOrDefault(AiProviderType.OPENAI.name(), AiProviderType.OPENAI.getSupportedModels().getFirst());
+
         String finalSourceCode = (sourceCode != null && !sourceCode.trim().isEmpty())
                 ? sourceCode
                 : "No source code provided. Analyze based on the error message alone.";
 
         String formattedPrompt = String.format(PromptTemplates.ANALYZE_ERROR_PROMPT, errorMessage, finalSourceCode);
 
-        JsonObject requestBody = buildRequestBody(formattedPrompt);
+        // 2. Pass the selected model into the body builder
+        JsonObject requestBody = buildRequestBody(formattedPrompt, selectedModel);
 
         return HttpRequest.newBuilder()
                 .uri(URI.create(API_URL))
@@ -55,27 +62,19 @@ public class OpenAiProvider extends BaseAiProvider {
      * <p>
      * This includes setting up a "system" message to define the AI's persona, a "user"
      * message containing the actual prompt, and configuring parameters such as the
-     * model (gpt-3.5-turbo) and low temperature for deterministic responses. It also
-     * explicitly forces the response format to be a JSON object.
+     * dynamically selected model and low temperature for deterministic responses.
+     * It also explicitly forces the response format to be a JSON object.
      *
      * @param formattedPrompt The final string prompt to be sent to the model.
+     * @param selectedModel   The specific OpenAI model selected by the user (e.g., "gpt-4o").
      * @return A {@link JsonObject} representing the entire HTTP request body.
      */
-    private JsonObject buildRequestBody(String formattedPrompt) {
-        JsonObject systemMessage = new JsonObject();
-        systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content", "You are an expert Java developer and debugging assistant.");
-
-        JsonObject userMessage = new JsonObject();
-        userMessage.addProperty("role", "user");
-        userMessage.addProperty("content", formattedPrompt);
-
-        JsonArray messages = new JsonArray();
-        messages.add(systemMessage);
-        messages.add(userMessage);
+    private JsonObject buildRequestBody(String formattedPrompt, String selectedModel) {
+        JsonArray messages = getMessages(formattedPrompt);
 
         JsonObject requestBody = new JsonObject();
-        requestBody.addProperty("model", "gpt-3.5-turbo");
+        // 4. Inject the dynamically selected model
+        requestBody.addProperty("model", selectedModel);
         requestBody.add("messages", messages);
         requestBody.addProperty("temperature", 0.2);
 
@@ -84,6 +83,22 @@ public class OpenAiProvider extends BaseAiProvider {
         requestBody.add("response_format", responseFormat);
 
         return requestBody;
+    }
+
+    private static @NotNull JsonArray getMessages(String formattedPrompt) {
+        JsonObject systemMessage = new JsonObject();
+        systemMessage.addProperty("role", "system");
+        // 3. Utilize the centralized PromptTemplates class for the persona
+        systemMessage.addProperty("content", PromptTemplates.SYSTEM_ROLE_PROMPT);
+
+        JsonObject userMessage = new JsonObject();
+        userMessage.addProperty("role", "user");
+        userMessage.addProperty("content", formattedPrompt);
+
+        JsonArray messages = new JsonArray();
+        messages.add(systemMessage);
+        messages.add(userMessage);
+        return messages;
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.github.juliarzymowska.plugin.settings;
 
+import com.github.juliarzymowska.plugin.api.providers.AiProviderType;
 import com.intellij.openapi.options.Configurable;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.Nullable;
@@ -44,64 +45,80 @@ public class AiExplainerConfigurable implements Configurable {
 
     /**
      * Checks if the user has modified any settings in the UI compared to the stored state.
-     * <p>
-     * It utilizes the {@link #initialKeysCache} to perform a lightning-fast comparison
-     * of the API keys without querying the operating system's credential store.
      *
      * @return {@code true} if the UI state differs from the saved state; {@code false} otherwise.
      */
     @Override
     public boolean isModified() {
         AiExplainerSettingsState settings = AiExplainerSettingsState.getInstance();
-        boolean modified = !settingsComponent.getGeminiModel().equals(settings.geminiModel);
 
-        Map<String, String> currentKeysInUI = settingsComponent.getApiKeys();
-        for (String provider : AiExplainerSettingsComponent.PROVIDERS) {
-            String initialKey = initialKeysCache.getOrDefault(provider, "");
-            String uiKey = currentKeysInUI.getOrDefault(provider, "");
-
-            if (!uiKey.equals(initialKey)) {
-                modified = true;
-                break;
+        // 1. Check if any selected models have been modified
+        Map<AiProviderType, String> uiModels = settingsComponent.getSelectedModels();
+        for (Map.Entry<AiProviderType, String> entry : uiModels.entrySet()) {
+            String savedModel = settings.selectedModels.get(entry.getKey().name());
+            if (!entry.getValue().equals(savedModel)) {
+                return true;
             }
         }
-        return modified;
+
+        // 2. Check if any API keys have been modified
+        Map<String, String> currentKeysInUI = settingsComponent.getApiKeys();
+        for (AiProviderType type : AiProviderType.values()) {
+            String providerName = type.getDisplayName();
+            String initialKey = initialKeysCache.getOrDefault(providerName, "");
+            String uiKey = currentKeysInUI.getOrDefault(providerName, "");
+
+            if (!uiKey.equals(initialKey)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
-     * Persists the user's changes.
-     * <p>
-     * Standard configuration options are saved to the plugin's XML state, while sensitive
-     * data (API keys) are securely pushed to the native keychain via {@link ApiKeyManager}.
-     * The in-memory cache is subsequently updated to reflect the newly saved state.
+     * Persists the user's changes to the XML state and the native keychain.
      */
     @Override
     public void apply() {
         AiExplainerSettingsState settings = AiExplainerSettingsState.getInstance();
-        settings.geminiModel = settingsComponent.getGeminiModel();
 
+        // Save selected models
+        Map<AiProviderType, String> uiModels = settingsComponent.getSelectedModels();
+        uiModels.forEach((type, model) -> settings.selectedModels.put(type.name(), model));
+
+        // Save API keys
         Map<String, String> currentKeysInUI = settingsComponent.getApiKeys();
         currentKeysInUI.forEach(ApiKeyManager::saveKey);
 
+        // Update the cache
+        initialKeysCache.clear();
         initialKeysCache.putAll(currentKeysInUI);
     }
 
     /**
      * Resets the UI components to match the currently stored state.
-     * <p>
-     * This method is called once when the settings page is opened, or when the user clicks
-     * the "Reset" button. It performs the heavy lifting of reading from the system keychain
-     * exactly once and populates both the UI and the local cache.
      */
     @Override
     public void reset() {
         AiExplainerSettingsState settings = AiExplainerSettingsState.getInstance();
-        settingsComponent.setGeminiModel(settings.geminiModel);
 
+        // Load saved models into UI
+        Map<AiProviderType, String> modelsToSet = new HashMap<>();
+        for (AiProviderType type : AiProviderType.values()) {
+            String savedModel = settings.selectedModels.get(type.name());
+            if (savedModel != null) {
+                modelsToSet.put(type, savedModel);
+            }
+        }
+        settingsComponent.setSelectedModels(modelsToSet);
+
+        // Load API keys into UI and Cache
         initialKeysCache.clear();
-        for (String provider : AiExplainerSettingsComponent.PROVIDERS) {
-            String key = ApiKeyManager.getKey(provider);
-            initialKeysCache.put(provider, key != null ? key : "");
+        for (AiProviderType type : AiProviderType.values()) {
+            String providerName = type.getDisplayName();
+            String key = ApiKeyManager.getKey(providerName);
+            initialKeysCache.put(providerName, key != null ? key : "");
         }
         settingsComponent.setApiKeys(initialKeysCache);
     }

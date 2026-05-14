@@ -1,6 +1,7 @@
 package com.github.juliarzymowska.plugin.api.providers;
 
 import com.github.juliarzymowska.plugin.api.PromptTemplates;
+import com.github.juliarzymowska.plugin.settings.AiExplainerSettingsState;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -32,7 +33,9 @@ public class GeminiProvider extends BaseAiProvider {
      */
     @Override
     protected HttpRequest buildHttpRequest(String errorMessage, String sourceCode, String apiKey) {
-        String selectedModel = com.github.juliarzymowska.plugin.settings.AiExplainerSettingsState.getInstance().geminiModel;
+        // Fetch the model dynamically from the new map, falling back to the default if null
+        String selectedModel = AiExplainerSettingsState.getInstance()
+                .selectedModels.getOrDefault(AiProviderType.GEMINI.name(), AiProviderType.GEMINI.getSupportedModels().getFirst());
 
         String apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + selectedModel + ":generateContent?key=" + apiKey;
 

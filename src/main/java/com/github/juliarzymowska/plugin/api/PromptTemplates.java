@@ -16,6 +16,12 @@ public final class PromptTemplates {
     }
 
     /**
+     * The system persona prompt used specifically for models that support
+     * system/developer roles (like OpenAI). It defines the overarching behavior.
+     */
+    public static final String SYSTEM_ROLE_PROMPT = "You are an expert Java developer and debugging assistant.";
+
+    /**
      * The primary prompt template used to request error analysis from the AI provider.
      * <p>
      * It instructs the AI to act as a Senior Software Engineer, defines the exact task

@@ -18,17 +18,29 @@ public class ApiKeyManager {
     private static final String SUBSYSTEM = "AiExplainerPlugin";
 
     /**
+     * OS keychains (macOS/Windows) often silently fail to save passwords if the username field is null.
+     * We use a dummy username to ensure strict compatibility with all native credential managers.
+     */
+    private static final String DUMMY_USERNAME = "API_KEY_USER";
+
+    /**
      * Securely saves the given API key for a specific AI provider to the system's credential store.
-     * <p>
-     * Note: The username field in the {@link Credentials} object is intentionally set to {@code null}
-     * because we are only storing a single secret token (the API key), not a username-password pair.
      *
      * @param providerName The name of the AI provider (e.g., "OpenAI", "Gemini"). Used to generate a unique storage key.
      * @param apiKey       The plain text API key to be encrypted and stored.
      */
     public static void saveKey(String providerName, String apiKey) {
         CredentialAttributes attributes = createAttributes(providerName);
-        Credentials credentials = new Credentials(null, apiKey);
+
+        // If the API key is null or empty, the user cleared the field.
+        // Passing null directly to the PasswordSafe tells it to completely delete the entry.
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            PasswordSafe.getInstance().set(attributes, null);
+            return;
+        }
+
+        // Save the key with our dummy username to satisfy OS requirements
+        Credentials credentials = new Credentials(DUMMY_USERNAME, apiKey);
         PasswordSafe.getInstance().set(attributes, credentials);
     }
 
