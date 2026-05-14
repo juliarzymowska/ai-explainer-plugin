@@ -1,11 +1,7 @@
 package com.github.juliarzymowska.plugin.toolWindow;
 
-import com.github.juliarzymowska.plugin.api.providers.AiProvider;
-import com.github.juliarzymowska.plugin.api.providers.AiProviderFactory;
 import com.github.juliarzymowska.plugin.api.providers.AiProviderType;
 import com.github.juliarzymowska.plugin.services.SharedStateService;
-import com.github.juliarzymowska.plugin.settings.ApiKeyManager;
-import com.github.juliarzymowska.plugin.utils.HtmlResponseRenderer;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.ui.JBColor;
@@ -19,15 +15,12 @@ import com.intellij.openapi.Disposable;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CancellationException;
 
 /**
  * The main graphical user interface for the AI Explainer tool window.
  * <p>
- * This panel is responsible for displaying the captured error context, allowing the user
- * to select an AI provider, dispatching the asynchronous API request, and safely rendering
- * the resulting HTML analysis back onto the main UI thread.
+ * This class is strictly a "View" component. All business logic, thread management,
+ * and API calls are delegated to the {@link AiAnalysisController}.
  */
 public class AiToolWindowPanel extends JPanel implements Disposable {
 
@@ -40,14 +33,13 @@ public class AiToolWindowPanel extends JPanel implements Disposable {
     private final ComboBox<String> providerSelector;
     private String lastHtmlResponse;
 
-    /**
-     * Holds the ongoing asynchronous API request, allowing the user to cancel it
-     * before it completes.
-     */
-    private CompletableFuture<String> currentAnalysisFuture;
+    // The controller handling the actual logic
+    private final AiAnalysisController controller;
 
     public AiToolWindowPanel(Project project) {
         this.project = project;
+        this.controller = new AiAnalysisController(project, this);
+
         setLayout(new BorderLayout());
 
         // --- 1. TOP PANEL: Selection and Controls ---
@@ -62,6 +54,7 @@ public class AiToolWindowPanel extends JPanel implements Disposable {
                 .toArray(String[]::new);
         providerSelector = new ComboBox<>(providerNames);
         providerSelector.setSelectedIndex(0);
+
         sendToAiButton = new JButton("Analyze with AI");
         sendToAiButton.setEnabled(false);
 
@@ -83,10 +76,8 @@ public class AiToolWindowPanel extends JPanel implements Disposable {
 
         // --- 2. BOTTOM PANEL: AI Response ---
         aiResponsePane = new JEditorPane();
-
         aiResponsePane.setEditorKit(HTMLEditorKitBuilder.simple());
         aiResponsePane.setEditable(false);
-
         // UX Trick: Hide the blinking cursor while still allowing text selection and copying
         aiResponsePane.putClientProperty("caretWidth", 0);
 
@@ -103,12 +94,12 @@ public class AiToolWindowPanel extends JPanel implements Disposable {
     }
 
     /**
-     * Initializes all event listeners for the UI components and subscribes to the
-     * {@link SharedStateService} to reactively update the UI when new errors are selected.
+     * Initializes UI event listeners and delegates actions to the Controller.
      */
     private void setupListeners() {
         SharedStateService sharedState = project.getService(SharedStateService.class);
 
+        // Listen for new errors selected by the user
         sharedState.setOnDataUpdatedCallback(() -> {
             errorTextArea.setText(sharedState.getErrorMessage());
 
@@ -122,9 +113,11 @@ public class AiToolWindowPanel extends JPanel implements Disposable {
             sendToAiButton.setEnabled(true);
         });
 
-        sendToAiButton.addActionListener(e -> performAnalysis());
-        stopButton.addActionListener(e -> cancelAnalysis());
+        // Delegate button clicks to the controller
+        sendToAiButton.addActionListener(e -> controller.startAnalysis((String) providerSelector.getSelectedItem()));
+        stopButton.addActionListener(e -> controller.cancelAnalysis());
 
+        // Listen for IDE theme changes to re-render HTML colors
         ApplicationManager.getApplication().getMessageBus().connect(this).subscribe(
                 LafManagerListener.TOPIC,
                 new LafManagerListener() {
@@ -132,8 +125,6 @@ public class AiToolWindowPanel extends JPanel implements Disposable {
                     public void lookAndFeelChanged(@org.jetbrains.annotations.NotNull LafManager source) {
                         SwingUtilities.invokeLater(() -> {
                             if (lastHtmlResponse != null) {
-                                // Ponowne wstrzyknięcie HTML-a wymusza przeliczenie stylów CSS
-                                // pod nowy, zaktualizowany motyw IDE.
                                 aiResponsePane.setText(lastHtmlResponse);
                             }
                         });
@@ -142,69 +133,46 @@ public class AiToolWindowPanel extends JPanel implements Disposable {
         );
     }
 
+    // --- PUBLIC API FOR THE CONTROLLER ---
+
     /**
-     * Orchestrates the API request lifecycle.
+     * Locks the UI and shows a loading state.
      */
-    private void performAnalysis() {
-        SharedStateService sharedState = project.getService(SharedStateService.class);
-        String selectedProvider = (String) providerSelector.getSelectedItem();
-        AiProviderType type = AiProviderType.fromDisplayName(selectedProvider);
-        String apiKey = ApiKeyManager.getKey(selectedProvider);
-
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            updateAiResponse("<html><body style='color: red; padding: 10px;'><b>Error:</b> API Key for " + selectedProvider + " is missing in Settings!</body></html>");
-            return;
-        }
-
-        // Lock UI during analysis
+    public void setLoadingState() {
         sendToAiButton.setEnabled(false);
         stopButton.setEnabled(true);
         updateAiResponse("<html><body style='font-family: sans-serif; padding: 10px;'><i>AI is thinking... \u23F3</i></body></html>");
-
-        AiProvider aiProvider = AiProviderFactory.getProvider(type);
-
-        currentAnalysisFuture = aiProvider.analyzeError(sharedState.getErrorMessage(), sharedState.getSourceCode(), apiKey);
-
-        currentAnalysisFuture
-                .thenAccept(response -> SwingUtilities.invokeLater(() -> {
-                    handleAiResponse(response, sharedState.getErrorMessage());
-                    stopButton.setEnabled(false);
-                }))
-                .exceptionally(ex -> {
-                    SwingUtilities.invokeLater(() -> {
-                        // Check if the exception was triggered by the user clicking "Stop"
-                        if (ex instanceof CancellationException || ex.getCause() instanceof CancellationException) {
-                            updateAiResponse("<html><body style='color: orange; padding: 10px;'><b>⚠️ Analysis cancelled by user.</b></body></html>");
-                        } else {
-                            updateAiResponse("<html><body style='color: red; padding: 10px;'><b>Plugin Error:</b><br>" + ex.getMessage() + "</body></html>");
-                        }
-                        sendToAiButton.setEnabled(true);
-                        stopButton.setEnabled(false);
-                    });
-                    return null;
-                });
     }
 
     /**
-     * Attempts to cancel the ongoing asynchronous API request if it hasn't completed yet.
+     * Unlocks the UI and displays the successful HTML response.
      */
-    private void cancelAnalysis() {
-        if (currentAnalysisFuture != null && !currentAnalysisFuture.isDone()) {
-            currentAnalysisFuture.cancel(true);
-        }
-    }
-
-    /**
-     * Delegates the raw JSON response to the renderer and updates the UI.
-     */
-    private void handleAiResponse(String response, String originalError) {
-        String finalHtml = HtmlResponseRenderer.render(response);
-        updateAiResponse(finalHtml);
+    public void showResponse(String html) {
+        updateAiResponse(html);
         sendToAiButton.setEnabled(true);
+        stopButton.setEnabled(false);
     }
 
     /**
-     * Injects the final HTML string into the JEditorPane and caches it for theme changes.
+     * Displays a red error message.
+     */
+    public void showError(String message) {
+        updateAiResponse("<html><body style='color: red; padding: 10px;'><b>Error:</b> " + message + "</body></html>");
+        sendToAiButton.setEnabled(true);
+        stopButton.setEnabled(false);
+    }
+
+    /**
+     * Displays an orange warning message.
+     */
+    public void showWarning(String message) {
+        updateAiResponse("<html><body style='color: orange; padding: 10px;'><b>⚠️ " + message + "</b></body></html>");
+        sendToAiButton.setEnabled(true);
+        stopButton.setEnabled(false);
+    }
+
+    /**
+     * Internal helper to safely update the JEditorPane text and cache it for theme changes.
      */
     private void updateAiResponse(String html) {
         this.lastHtmlResponse = html;
@@ -213,5 +181,6 @@ public class AiToolWindowPanel extends JPanel implements Disposable {
 
     @Override
     public void dispose() {
+        // Left empty intentionally. Required for Disposer tree registration.
     }
 }
