@@ -11,6 +11,11 @@ import com.intellij.openapi.ui.ComboBox;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ide.ui.LafManager;
+import com.intellij.ide.ui.LafManagerListener;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.util.ui.HTMLEditorKitBuilder;
+import com.intellij.openapi.Disposable;
 
 import javax.swing.*;
 import java.awt.*;
@@ -24,7 +29,7 @@ import java.util.concurrent.CancellationException;
  * to select an AI provider, dispatching the asynchronous API request, and safely rendering
  * the resulting HTML analysis back onto the main UI thread.
  */
-public class AiToolWindowPanel extends JPanel {
+public class AiToolWindowPanel extends JPanel implements Disposable {
 
     private final Project project;
     private final JTextArea errorTextArea;
@@ -33,6 +38,7 @@ public class AiToolWindowPanel extends JPanel {
     private final JButton stopButton;
     private final JLabel contextLabel;
     private final ComboBox<String> providerSelector;
+    private String lastHtmlResponse;
 
     /**
      * Holds the ongoing asynchronous API request, allowing the user to cancel it
@@ -77,13 +83,14 @@ public class AiToolWindowPanel extends JPanel {
 
         // --- 2. BOTTOM PANEL: AI Response ---
         aiResponsePane = new JEditorPane();
-        aiResponsePane.setContentType("text/html");
+
+        aiResponsePane.setEditorKit(HTMLEditorKitBuilder.simple());
         aiResponsePane.setEditable(false);
 
         // UX Trick: Hide the blinking cursor while still allowing text selection and copying
         aiResponsePane.putClientProperty("caretWidth", 0);
 
-        aiResponsePane.setText("<html><body style='font-family: sans-serif; color: gray; padding: 10px;'>Waiting for analysis...</body></html>");
+        updateAiResponse("<html><body style='font-family: sans-serif; color: gray; padding: 10px;'>Waiting for analysis...</body></html>");
 
         // --- 3. LAYOUT: Splitter ---
         JBSplitter splitter = new JBSplitter(true, 0.3f);
@@ -107,24 +114,36 @@ public class AiToolWindowPanel extends JPanel {
 
             if (sharedState.getSourceCode() != null && !sharedState.getSourceCode().isEmpty()) {
                 contextLabel.setText("Context: Source code attached \u2705");
-                contextLabel.setForeground(new Color(0, 150, 0));
+                contextLabel.setForeground(JBColor.GREEN);
             } else {
                 contextLabel.setText("Context: No source code \u274C");
-                contextLabel.setForeground(Color.RED);
+                contextLabel.setForeground(JBColor.RED);
             }
             sendToAiButton.setEnabled(true);
         });
 
         sendToAiButton.addActionListener(e -> performAnalysis());
         stopButton.addActionListener(e -> cancelAnalysis());
+
+        ApplicationManager.getApplication().getMessageBus().connect(this).subscribe(
+                LafManagerListener.TOPIC,
+                new LafManagerListener() {
+                    @Override
+                    public void lookAndFeelChanged(@org.jetbrains.annotations.NotNull LafManager source) {
+                        SwingUtilities.invokeLater(() -> {
+                            if (lastHtmlResponse != null) {
+                                // Ponowne wstrzyknięcie HTML-a wymusza przeliczenie stylów CSS
+                                // pod nowy, zaktualizowany motyw IDE.
+                                aiResponsePane.setText(lastHtmlResponse);
+                            }
+                        });
+                    }
+                }
+        );
     }
 
     /**
      * Orchestrates the API request lifecycle.
-     * <p>
-     * It validates the API key, locks the UI buttons, dispatches the network request on a
-     * background thread, and ensures that all UI updates (both success and error states)
-     * are pushed back to the Event Dispatch Thread (EDT) via {@link SwingUtilities#invokeLater(Runnable)}.
      */
     private void performAnalysis() {
         SharedStateService sharedState = project.getService(SharedStateService.class);
@@ -177,9 +196,6 @@ public class AiToolWindowPanel extends JPanel {
 
     /**
      * Delegates the raw JSON response to the renderer and updates the UI.
-     *
-     * @param response      The raw JSON string returned by the AI provider.
-     * @param originalError The original error message (reserved for future context usage).
      */
     private void handleAiResponse(String response, String originalError) {
         String finalHtml = HtmlResponseRenderer.render(response);
@@ -188,11 +204,14 @@ public class AiToolWindowPanel extends JPanel {
     }
 
     /**
-     * Injects the final HTML string into the JEditorPane.
-     *
-     * @param html The fully formatted HTML string.
+     * Injects the final HTML string into the JEditorPane and caches it for theme changes.
      */
     private void updateAiResponse(String html) {
+        this.lastHtmlResponse = html;
         aiResponsePane.setText(html);
+    }
+
+    @Override
+    public void dispose() {
     }
 }

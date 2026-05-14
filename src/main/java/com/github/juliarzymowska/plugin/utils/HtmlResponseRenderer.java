@@ -29,13 +29,14 @@ public class HtmlResponseRenderer {
 
     /**
      * Embedded CSS styles for formatting code blocks and headers in the UI.
+     * Modern properties like 'rgba' or 'border-radius' have been removed
+     * to prevent NullPointerExceptions during theme switching.
      */
     private static final String CSS_STYLE = "<style>" +
-            "code { background-color: rgba(128, 128, 128, 0.2); padding: 2px 4px; border-radius: 4px; font-family: monospace; }" +
-            "pre { background-color: rgba(128, 128, 128, 0.1); padding: 8px; border-radius: 4px; }" +
+            "code { padding: 2px; font-family: monospace; }" +
+            "pre { padding: 8px; }" +
             "h3 { margin-bottom: 5px; }" +
             "</style>";
-
     /**
      * Parses the raw JSON response, extracts the specific error analysis fields,
      * converts their Markdown content to HTML, and wraps them in a styled HTML template.

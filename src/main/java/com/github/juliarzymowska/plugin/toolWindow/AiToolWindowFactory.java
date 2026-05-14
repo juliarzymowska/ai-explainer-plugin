@@ -1,6 +1,7 @@
 package com.github.juliarzymowska.plugin.toolWindow;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.content.Content;
@@ -17,8 +18,10 @@ public class AiToolWindowFactory implements ToolWindowFactory {
 
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
-        AiToolWindowPanel mainPanel = new AiToolWindowPanel(project);
-        Content content = ContentFactory.getInstance().createContent(mainPanel, "", false);
+        AiToolWindowPanel panel = new AiToolWindowPanel(project);
+        ContentFactory contentFactory = ContentFactory.getInstance();
+        Content content = contentFactory.createContent(panel, "", false);
+        Disposer.register(content, panel);
         toolWindow.getContentManager().addContent(content);
     }
 }
