@@ -2,6 +2,8 @@ package com.github.juliarzymowska.plugin.utils;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.intellij.ui.ColorUtil;
+import com.intellij.ui.JBColor;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
 
@@ -51,22 +53,22 @@ public class HtmlResponseRenderer {
         try {
             JsonObject json = gson.fromJson(rawJsonResponse, JsonObject.class);
 
-            // Extract and convert Markdown fields to HTML
             String summaryHtml = htmlRenderer.render(mdParser.parse(json.get("errorSummary").getAsString()));
             String causeHtml = htmlRenderer.render(mdParser.parse(json.get("rootCause").getAsString()));
             String fixHtml = htmlRenderer.render(mdParser.parse(json.get("suggestedFix").getAsString()));
 
-            // Assemble the final HTML document with injected CSS
+            String colorRed = ColorUtil.toHtmlColor(JBColor.RED);
+            String colorOrange = ColorUtil.toHtmlColor(JBColor.ORANGE);
+            String colorGreen = ColorUtil.toHtmlColor(JBColor.GREEN);
+
             return "<html><head>" + CSS_STYLE + "</head><body style='font-family: sans-serif; padding: 10px;'>" +
-                    "<h3 style='color: #d9534f;'>SUMMARY</h3>" + summaryHtml +
-                    "<h3 style='color: #f0ad4e;'>CAUSE</h3>" + causeHtml +
-                    "<h3 style='color: #5cb85c;'>FIX</h3>" + fixHtml +
+                    "<h3 style='color: " + colorRed + ";'>SUMMARY</h3>" + summaryHtml +
+                    "<h3 style='color: " + colorOrange + ";'>CAUSE</h3>" + causeHtml +
+                    "<h3 style='color: " + colorGreen + ";'>FIX</h3>" + fixHtml +
                     "</body></html>";
 
         } catch (Exception e) {
-            // Fallback mechanism for broken JSON or unexpected formats
             System.err.println("CRITICAL RENDERER ERROR: " + e.getMessage());
             return "<html><body style='padding: 10px;'><pre>" + rawJsonResponse + "</pre></body></html>";
         }
-    }
-}
+    }}

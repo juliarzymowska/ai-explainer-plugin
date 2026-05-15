@@ -5,6 +5,7 @@ import com.github.juliarzymowska.plugin.services.SharedStateService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.ui.JBColor;
+import com.intellij.ui.ColorUtil;
 import com.intellij.ui.JBSplitter;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ide.ui.LafManager;
@@ -157,7 +158,8 @@ public class AiToolWindowPanel extends JPanel implements Disposable {
      * Displays a red error message.
      */
     public void showError(String message) {
-        updateAiResponse("<html><body style='color: red; padding: 10px;'><b>Error:</b> " + message + "</body></html>");
+        String errorColor = com.intellij.ui.ColorUtil.toHtmlColor(JBColor.RED);
+        updateAiResponse("<html><body style='color: " + errorColor + "; padding: 10px;'><b>Error:</b> " + message + "</body></html>");
         sendToAiButton.setEnabled(true);
         stopButton.setEnabled(false);
     }
@@ -166,7 +168,8 @@ public class AiToolWindowPanel extends JPanel implements Disposable {
      * Displays an orange warning message.
      */
     public void showWarning(String message) {
-        updateAiResponse("<html><body style='color: orange; padding: 10px;'><b>⚠️ " + message + "</b></body></html>");
+        String warningColor = ColorUtil.toHtmlColor(JBColor.ORANGE);
+        updateAiResponse("<html><body style='color: " + warningColor + "; padding: 10px;'><b>⚠️ " + message + "</b></body></html>");
         sendToAiButton.setEnabled(true);
         stopButton.setEnabled(false);
     }

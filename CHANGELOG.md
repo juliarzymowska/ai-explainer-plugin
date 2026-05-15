@@ -1,4 +1,4 @@
-# AI Console Explainer Changelog
+# AI Explainer Changelog
 
 ## [Unreleased]
 ### Added
