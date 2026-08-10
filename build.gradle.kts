@@ -21,7 +21,7 @@ repositories {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
-    implementation("org.commonmark:commonmark:0.28.0")
+    implementation("org.commonmark:commonmark:0.30.0")
 
     intellijPlatform {
         intellijIdea("2025.2.6.2")
